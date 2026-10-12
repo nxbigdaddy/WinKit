@@ -1,0 +1,285 @@
+<Window x:Class="WinKit.App.Views.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="WinKit · Windows 工具箱"
+        Width="{Binding WindowWidth, FallbackValue=1180}"
+        Height="{Binding WindowHeight, FallbackValue=720}"
+        MinWidth="900"
+        MinHeight="600"
+        WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True"
+        Background="{DynamicResource WindowBackgroundBrush}"
+        FontFamily="{DynamicResource AppFontFamily}"
+        SourceInitialized="OnSourceInitialized">
+
+    <Window.Resources>
+        <!-- WPF 内置转换器（System.Windows.Controls），无需 xmlns 前缀，也不依赖任何第三方/他人文件 -->
+        <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- ============ 顶栏：品牌 / 搜索 / 状态 / 权限徽章 / 主题按钮 ============ -->
+        <Border Grid.Row="0"
+                Background="{DynamicResource SurfaceBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="WinKit"
+                           FontSize="{DynamicResource FontSizeLarge}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="2,0,16,0" />
+
+                <!-- 搜索框：Ctrl+K 聚焦 -->
+                <Grid Grid.Column="1" Width="320" VerticalAlignment="Center">
+                    <TextBox x:Name="SearchBox"
+                             Style="{StaticResource AppTextBoxStyle}"
+                             Padding="28,6,8,6"
+                             Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}" />
+                    <TextBlock Text="&#xE721;"
+                               FontFamily="Segoe MDL2 Assets"
+                               FontSize="13"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               VerticalAlignment="Center"
+                               Margin="9,0,0,0"
+                               IsHitTestVisible="False" />
+                    <TextBlock Text="搜索功能…（Ctrl+K）"
+                               VerticalAlignment="Center"
+                               Margin="28,0,8,0"
+                               TextTrimming="CharacterEllipsis"
+                               IsHitTestVisible="False">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+                                <Setter Property="Visibility" Value="Collapsed" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding SearchText}" Value="">
+                                        <Setter Property="Visibility" Value="Visible" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </Grid>
+
+                <TextBlock Grid.Column="2"
+                           Text="{Binding StatusText}"
+                           Style="{StaticResource CaptionTextStyle}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Margin="12,0"
+                           TextTrimming="CharacterEllipsis" />
+
+                <!-- 权限徽章：管理员时用强调色 -->
+                <Border Grid.Column="3"
+                        Background="{DynamicResource SurfaceAltBrush}"
+                        BorderBrush="{DynamicResource BorderBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{DynamicResource CornerRadiusSmall}"
+                        Padding="8,4"
+                        Margin="0,0,8,0"
+                        VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="&#xE72E;"
+                                   FontFamily="Segoe MDL2 Assets"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,6,0">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsElevated}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                        <TextBlock Text="{Binding PermissionText}" VerticalAlignment="Center">
+                            <TextBlock.Style>
+                                <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+                                    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsElevated}" Value="True">
+                                            <Setter Property="Foreground" Value="{DynamicResource AccentBrush}" />
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </TextBlock.Style>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <Button Grid.Column="4"
+                        Style="{StaticResource IconButtonStyle}"
+                        Content="&#xE793;"
+                        Command="{Binding ToggleThemeCommand}"
+                        ToolTip="{Binding ThemeLabel, StringFormat=主题：{0}（点击切换）}"
+                        VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- ============ 主体：左侧导航 + 内容区 ============ -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="210" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Background="{DynamicResource SidebarBackgroundBrush}"
+                    BorderBrush="{DynamicResource BorderBrush}"
+                    BorderThickness="0,0,1,0">
+                <ListBox Style="{StaticResource NavListBoxStyle}"
+                         ItemContainerStyle="{StaticResource NavListBoxItemStyle}"
+                         ItemsSource="{Binding ModulesView}"
+                         SelectedItem="{Binding SelectedModule, Mode=TwoWay}"
+                         IsSynchronizedWithCurrentItem="False"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.GroupStyle>
+                        <GroupStyle>
+                            <GroupStyle.HeaderTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Name}"
+                                               Style="{StaticResource CaptionTextStyle}"
+                                               FontWeight="SemiBold"
+                                               Margin="10,10,0,4" />
+                                </DataTemplate>
+                            </GroupStyle.HeaderTemplate>
+                        </GroupStyle>
+                    </ListBox.GroupStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0"
+                                           Text="{Binding Icon}"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="14"
+                                           VerticalAlignment="Center"
+                                           Margin="0,0,10,0" />
+
+                                <TextBlock Grid.Column="1"
+                                           Text="{Binding Title}"
+                                           VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" />
+
+                                <!-- 需要管理员权限的模块显示盾牌 -->
+                                <TextBlock Grid.Column="2"
+                                           Text="&#xE72E;"
+                                           FontFamily="Segoe MDL2 Assets"
+                                           FontSize="12"
+                                           Foreground="{DynamicResource WarningBrush}"
+                                           VerticalAlignment="Center"
+                                           Margin="6,0,0,0"
+                                           ToolTip="需要管理员权限"
+                                           Visibility="{Binding RequiresAdmin, Converter={StaticResource BoolToVisibilityConverter}}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+
+            <Grid Grid.Column="1">
+                <!--
+                  页面宿主：这里刻意显式 DataContext="{x:Null}"，不让页面继承 MainViewModel
+                  （四个页面各自准备自己的 ViewModel；继承过去只会白建一个 VM 或让绑定静默失败）。
+                  正因为 DataContext 被清空，Content 不能用普通绑定，也不适合用
+                  RelativeSource FindAncestor（实测在此宿主上取不到源，Content 一直是 null），
+                  改由 code-behind 用显式 Source 绑定到外壳 VM（见 MainWindow.xaml.cs）。
+                  切页时 VM 会先把 CurrentView 置空再赋新值，保证旧页面 Unloaded 一定触发。
+                -->
+                <ContentControl
+                    x:Name="PageHost"
+                    DataContext="{x:Null}"
+                    Margin="14" />
+
+                <!-- 一个模块都没有时的兜底提示（模块由 ModuleRegistry 反射发现） -->
+                <TextBlock Text="没有可用的功能模块。请确认程序集里存在 IToolModule 实现。"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           TextWrapping="Wrap"
+                           MaxWidth="360"
+                           TextAlignment="Center">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+                            <Setter Property="Visibility" Value="Collapsed" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding CurrentView}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Visible" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </Grid>
+        </Grid>
+
+        <!-- ============ 底栏：数据目录 · 权限 · 模式 · 版本 + 两个快捷按钮 ============ -->
+        <Border Grid.Row="2"
+                Background="{DynamicResource SurfaceAltBrush}"
+                BorderBrush="{DynamicResource BorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="12,6">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding DataDirectoryText}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="·" Style="{StaticResource CaptionTextStyle}" Margin="8,0" />
+                    <TextBlock Text="{Binding PermissionText}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="·" Style="{StaticResource CaptionTextStyle}" Margin="8,0" />
+                    <TextBlock Text="{Binding ModeText}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               VerticalAlignment="Center" />
+                    <TextBlock Text="·" Style="{StaticResource CaptionTextStyle}" Margin="8,0" />
+                    <TextBlock Text="{Binding VersionText}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               VerticalAlignment="Center" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource IconButtonStyle}"
+                            Content="&#xE838;"
+                            Command="{Binding OpenDataFolderCommand}"
+                            ToolTip="打开数据目录"
+                            Margin="0,0,6,0" />
+                    <Button Style="{StaticResource IconButtonStyle}"
+                            Content="&#xE8A5;"
+                            Command="{Binding OpenLogFolderCommand}"
+                            ToolTip="打开日志目录" />
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</Window>

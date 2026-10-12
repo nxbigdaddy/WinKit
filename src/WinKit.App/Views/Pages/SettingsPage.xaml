@@ -1,0 +1,326 @@
+<UserControl x:Class="WinKit.App.Views.Pages.SettingsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinKit.App.ViewModels"
+             Loaded="OnLoaded">
+
+    <UserControl.Resources>
+        <!-- 两个页面共用的转换器（定义在 ViewModels\Converters.cs）。
+             StaticResource / DynamicResource 查的是资源字典里的 x:Key，不是 CLR 类名，
+             所以转换器类必须在每个用它的页面里显式声明一个资源键。 -->
+        <vm:BoolToVisibility x:Key="BoolToVisibility" />
+        <vm:BoolToVisibilityInverted x:Key="BoolToVisibilityInverted" />
+        <vm:StringMatch x:Key="StringMatch" />
+    </UserControl.Resources>
+
+    <ScrollViewer Background="{DynamicResource WindowBackgroundBrush}"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="16,16,16,4">
+        <StackPanel>
+
+            <!-- 页头 -->
+            <DockPanel LastChildFill="False" Margin="0,0,0,12">
+                <TextBlock DockPanel.Dock="Left"
+                           Text="设置"
+                           Style="{StaticResource PageTitleTextStyle}"
+                           Margin="0" />
+                <TextBlock DockPanel.Dock="Left"
+                           Text="{Binding VersionText, StringFormat='WinKit {0}'}"
+                           Style="{StaticResource CaptionTextStyle}"
+                           Margin="12,0,0,2"
+                           VerticalAlignment="Center" />
+                <Button DockPanel.Dock="Right"
+                        Content="保存设置"
+                        Style="{StaticResource PrimaryButtonStyle}"
+                        Command="{Binding SaveCommand}" />
+            </DockPanel>
+
+            <!-- 1. 外观 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="外观" Style="{StaticResource SectionTitleTextStyle}" />
+                    <RadioButton x:Name="ThemeDarkRadio"
+                                 Content="深色"
+                                 GroupName="ThemeMode"
+                                 IsChecked="{Binding IsDarkTheme, Mode=OneWay}"
+                                 Click="OnThemeDarkClick" />
+                    <RadioButton x:Name="ThemeLightRadio"
+                                 Content="浅色"
+                                 GroupName="ThemeMode"
+                                 Margin="0,6,0,0"
+                                 IsChecked="{Binding SelectedTheme, Converter={StaticResource StringMatch}, ConverterParameter=Light, Mode=OneWay}"
+                                 Click="OnThemeLightClick" />
+                    <RadioButton x:Name="ThemeSystemRadio"
+                                 Content="跟随系统"
+                                 GroupName="ThemeMode"
+                                 Margin="0,6,0,0"
+                                 IsChecked="{Binding SelectedTheme, Converter={StaticResource StringMatch}, ConverterParameter=System, Mode=OneWay}"
+                                 Click="OnThemeSystemClick" />
+                    <TextBlock Text="「跟随系统」会读取 Windows 的浅色 / 深色设置；切换后界面立即生效，无需重启。"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- 2. 安全 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="安全" Style="{StaticResource SectionTitleTextStyle}" />
+                    <CheckBox Content="只读审计模式"
+                              Style="{StaticResource AppCheckBoxStyle}"
+                              IsChecked="{Binding ReadOnlyMode, Mode=TwoWay}" />
+                    <TextBlock Text="开启后禁用一切写操作，只允许扫描与导出；开启期间撤销中心也无法回滚。"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="22,2,0,0"
+                               TextWrapping="Wrap" />
+                    <CheckBox Content="危险操作前需要确认"
+                              Style="{StaticResource AppCheckBoxStyle}"
+                              Margin="0,10,0,0"
+                              IsChecked="{Binding ConfirmDangerousActions, Mode=TwoWay}" />
+                    <TextBlock Text="关闭后删除 / 覆盖类操作不再逐次弹窗确认，仅建议在受控环境中关闭。"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="22,2,0,0"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Text="受保护目录"
+                               Style="{StaticResource SectionTitleTextStyle}"
+                               FontSize="{DynamicResource FontSizeNormal}"
+                               Margin="0,14,0,4" />
+                    <TextBlock Text="{Binding ProtectedPathsHint}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="0,0,0,4" />
+                    <ItemsControl ItemsSource="{Binding ProtectedPaths}"
+                                  Visibility="{Binding HasCustomProtectedPaths, Converter={StaticResource BoolToVisibility}}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}"
+                                           FontFamily="{DynamicResource AppMonoFontFamily}"
+                                           FontSize="{DynamicResource FontSizeSmall}"
+                                           Foreground="{DynamicResource TextSecondaryBrush}"
+                                           Margin="0,1,0,0"
+                                           TextWrapping="Wrap" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="未添加自定义保护目录"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Visibility="{Binding HasCustomProtectedPaths, Converter={StaticResource BoolToVisibilityInverted}}" />
+                    <TextBlock Text="内置保护：Windows、Program Files、ProgramData、桌面、文档、图片等关键目录默认拒绝写入。"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- 3. AI 助手（可选联网；默认关闭。卡片位置紧跟"安全"之后，因为它是隐私承诺的一部分） -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="AI 助手" Style="{StaticResource SectionTitleTextStyle}" />
+
+                    <CheckBox Content="启用 AI 助手（默认关闭）"
+                              Style="{StaticResource AppCheckBoxStyle}"
+                              IsChecked="{Binding AiEnabled, Mode=TwoWay}" />
+
+                    <TextBlock Text="默认不联网。只有你主动点击『用 AI 解释』并确认发送时才会联网；发送前会显示将要发送的确切内容并可修改。WinKit 不会在后台联网、不上传文件内容。"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="22,2,0,0"
+                               TextWrapping="Wrap" />
+
+                    <Border BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="0,1,0,0"
+                            Margin="0,12,0,10" />
+
+                    <TextBlock Text="DeepSeek API Key"
+                               FontFamily="{DynamicResource AppFontFamily}"
+                               FontSize="{DynamicResource FontSizeNormal}"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               Margin="0,0,0,4" />
+
+                    <DockPanel LastChildFill="True" IsEnabled="{Binding AiEnabled}">
+                        <Button DockPanel.Dock="Right"
+                                Content="删除"
+                                Style="{StaticResource DangerButtonStyle}"
+                                Margin="8,0,0,0"
+                                Command="{Binding DeleteAiKeyCommand}" />
+                        <Button DockPanel.Dock="Right"
+                                Content="保存"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Margin="8,0,0,0"
+                                Command="{Binding SaveAiKeyCommand}" />
+                        <!-- 这里用普通 TextBox 显示明文：输入的是用户自己的 key，能核对比打码更重要。
+                             已保存的 key 永远不会回填到这里，只以掩码形式展示。 -->
+                        <TextBox Style="{StaticResource AppTextBoxStyle}"
+                                 FontFamily="{DynamicResource AppMonoFontFamily}"
+                                 Text="{Binding AiKeyInput, UpdateSourceTrigger=PropertyChanged}"
+                                 ToolTip="粘贴 DeepSeek API Key（sk- 开头）" />
+                    </DockPanel>
+
+                    <TextBlock Text="{Binding AiKeyMaskText}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Text="{Binding AiKeyStoragePath, StringFormat='加密存储位置：{0}'}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               FontFamily="{DynamicResource AppMonoFontFamily}"
+                               Margin="0,2,0,0"
+                               TextWrapping="Wrap" />
+
+                    <TextBlock Text="{Binding AiBaseUrl, StringFormat='服务地址：{0}'}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               FontFamily="{DynamicResource AppMonoFontFamily}"
+                               Margin="0,2,0,0"
+                               TextWrapping="Wrap" />
+
+                    <Border BorderBrush="{DynamicResource BorderBrush}"
+                            BorderThickness="0,1,0,0"
+                            Margin="0,12,0,10" />
+
+                    <DockPanel LastChildFill="False" IsEnabled="{Binding AiEnabled}">
+                        <Button DockPanel.Dock="Left"
+                                Content="测试连接"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding TestAiConnectionCommand}" />
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="会向 DeepSeek 发送一句固定的测试文本，不含你的任何数据。"
+                                   Style="{StaticResource CaptionTextStyle}"
+                                   Margin="10,0,0,0"
+                                   VerticalAlignment="Center"
+                                   TextWrapping="Wrap" />
+                    </DockPanel>
+
+                    <TextBlock Text="{Binding AiStatusText}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="0,8,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- 4. 性能 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="性能" Style="{StaticResource SectionTitleTextStyle}" />
+                    <DockPanel LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="采样间隔"
+                                   VerticalAlignment="Center" />
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="{Binding SampleIntervalText}"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                    <Slider Minimum="200"
+                            Maximum="5000"
+                            TickFrequency="100"
+                            IsSnapToTickEnabled="True"
+                            LargeChange="500"
+                            Margin="0,6,0,0"
+                            Value="{Binding SampleIntervalMs, Mode=TwoWay}" />
+                    <TextBlock Text="图表与进程列表的刷新间隔，越小越实时但越费 CPU（范围 200 ~ 5000 毫秒，最小 200）。"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="0,4,0,0"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- 4. 数据与位置 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="数据与位置" Style="{StaticResource SectionTitleTextStyle}" />
+
+                    <DockPanel LastChildFill="False" Margin="0,2,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="数据目录" Width="86" VerticalAlignment="Center" />
+                        <Button DockPanel.Dock="Right"
+                                Content="打开"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding OpenDataFolderCommand}" />
+                        <TextBlock Text="{Binding DataDirectoryText}"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}"
+                                   FontSize="{DynamicResource FontSizeSmall}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+
+                    <DockPanel LastChildFill="False" Margin="0,8,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="运行模式" Width="86" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ModeText}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <DockPanel LastChildFill="False" Margin="0,8,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="配置文件" Width="86" VerticalAlignment="Center" />
+                        <Button DockPanel.Dock="Right"
+                                Content="复制路径"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding CopyConfigPathCommand}" />
+                        <TextBlock Text="{Binding ConfigFilePath}"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}"
+                                   FontSize="{DynamicResource FontSizeSmall}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+
+                    <DockPanel LastChildFill="False" Margin="0,8,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="日志文件" Width="86" VerticalAlignment="Center" />
+                        <Button DockPanel.Dock="Right"
+                                Content="打开日志目录"
+                                Style="{StaticResource SecondaryButtonStyle}"
+                                Command="{Binding OpenLogFolderCommand}" />
+                        <TextBlock Text="{Binding LogFilePath}"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}"
+                                   FontSize="{DynamicResource FontSizeSmall}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center"
+                                   Margin="0,0,8,0"
+                                   TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+
+                    <DockPanel LastChildFill="False" Margin="0,8,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="程序版本" Width="86" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding VersionText}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <DockPanel LastChildFill="False" Margin="0,8,0,0">
+                        <TextBlock DockPanel.Dock="Left" Text="当前权限" Width="86" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding PermissionText}"
+                                   Foreground="{DynamicResource TextPrimaryBrush}"
+                                   VerticalAlignment="Center" />
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- 5. 关于 -->
+            <Border Style="{StaticResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="关于" Style="{StaticResource SectionTitleTextStyle}" />
+                    <TextBlock Text="WinKit 是免安装、便携的 Windows 图形化工具箱：解压即用，删除目录即卸载。"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="全程不联网、不上传任何数据：没有网络请求、没有遥测、没有账号；所有日志与操作记录只写在本地数据目录。"
+                               Foreground="{DynamicResource TextPrimaryBrush}"
+                               Margin="0,6,0,0"
+                               TextWrapping="Wrap" />
+                    <TextBlock Text="{Binding VersionText, StringFormat='当前版本：{0}'}"
+                               Style="{StaticResource CaptionTextStyle}"
+                               Margin="0,8,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- 底部状态 -->
+            <TextBlock Text="{Binding StatusMessage}"
+                       Style="{StaticResource CaptionTextStyle}"
+                       Margin="2,0,0,12"
+                       TextWrapping="Wrap" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,0 +1,276 @@
+<UserControl x:Class="WinKit.App.Views.Pages.HealthPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinKit.App.ViewModels"
+             Background="{DynamicResource WindowBackgroundBrush}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontSize="{DynamicResource FontSizeNormal}"
+             Foreground="{DynamicResource TextPrimaryBrush}">
+
+    <!--
+        一键体检页。**这一页没有任何写操作入口**：不清理、不删除、不改注册表。
+        它的产物只有一份"哪里有问题、该去哪一页处理"的清单。
+        资源引用一律用 DynamicResource（主题切换要即时生效），
+        只有页内自建的样式/转换器才用 StaticResource。
+    -->
+    <UserControl.Resources>
+        <!-- 页内共用的可见性转换器，不放进全局字典，避免和其它页面抢同一个键 -->
+        <vm:BoolToVisibility x:Key="BoolToVisibility" />
+
+        <!--
+            体检状态徽章。只给文字上色、背景留透明 ——
+            这样不必为了四种状态额外造画刷键，主题切换也能自动跟着走。
+        -->
+        <Style x:Key="HealthBadgeTextStyle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="Critical">
+                    <Setter Property="Foreground" Value="{DynamicResource DangerBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Warning">
+                    <Setter Property="Foreground" Value="{DynamicResource WarningBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="Ok">
+                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer Padding="16"
+                  Background="{DynamicResource WindowBackgroundBrush}"
+                  VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- 行0 页头：定位说明 + 操作 -->
+            <Grid Grid.Row="0" Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock Text="一键体检"
+                               Style="{DynamicResource PageTitleTextStyle}"
+                               Margin="0" />
+                    <TextBlock Text="只做扫描与判断，不会清理或修改任何东西；发现问题会告诉你该去哪一页处理。"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1"
+                            VerticalAlignment="Center"
+                            Margin="16,0,0,0">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="开始体检"
+                                Style="{DynamicResource PrimaryButtonStyle}"
+                                Command="{Binding RunCommand}"
+                                MinWidth="96"
+                                ToolTip="扫描磁盘、内存、进程、可清理内容、回收站与隔离区，然后给出评分与逐项建议（全程只读）" />
+                        <Button Content="取消"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding CancelCommand}"
+                                IsEnabled="{Binding IsRunning}"
+                                Margin="8,0,0,0"
+                                ToolTip="中止正在进行的体检（已收集的数据会被丢弃，不会留下半截结果）" />
+                        <!-- 会联网的功能：按钮文案如实写出来，不和上面的本地操作混在一起 -->
+                        <Button Content="用 AI 解释"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding ExplainWithAiCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="会联网（DeepSeek）：点「确定」前会先显示将要发送的全部内容。只发送体检分数与各检查项的说明，不含任何文件路径。" />
+                    </StackPanel>
+
+                    <!-- 按钮旁边那行小字：可用时说清"先预览再联网"，不可用时直接给出原因 -->
+                    <TextBlock Text="{Binding AiAvailabilityHint}"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               HorizontalAlignment="Right"
+                               TextWrapping="Wrap"
+                               MaxWidth="520"
+                               Margin="0,6,0,0" />
+                </StackPanel>
+            </Grid>
+
+            <!-- 行1 只读审计模式提示（体检本身只读，所以只提示不拦截） -->
+            <Border Grid.Row="1"
+                    Margin="0,0,0,12"
+                    Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource WarningBrush}"
+                    BorderThickness="4,0,0,0"
+                    CornerRadius="{DynamicResource CornerRadiusSmall}"
+                    Padding="12,8"
+                    Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding ReadOnlyNotice}"
+                           Foreground="{DynamicResource WarningBrush}"
+                           FontSize="{DynamicResource FontSizeNormal}"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <!-- 行2 进度行 -->
+            <StackPanel Grid.Row="2"
+                        Margin="0,0,0,12"
+                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisibility}}">
+                <ProgressBar Style="{DynamicResource AppProgressBarStyle}"
+                             Value="{Binding ProgressPercent, Mode=OneWay}"
+                             Minimum="0"
+                             Maximum="100" />
+                <TextBlock Text="{Binding ProgressText}"
+                           Style="{DynamicResource CaptionTextStyle}"
+                           Margin="0,6,0,0"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+
+            <!-- 行3 结论卡片 -->
+            <Border Grid.Row="3"
+                    Style="{DynamicResource CardBorderStyle}"
+                    Margin="0,0,0,12"
+                    Visibility="{Binding HasResult, Converter={StaticResource BoolToVisibility}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 左侧大号评分 -->
+                    <StackPanel Grid.Column="0"
+                                Orientation="Horizontal"
+                                VerticalAlignment="Center"
+                                Margin="0,0,20,0">
+                        <TextBlock Text="{Binding ScoreText}"
+                                   Style="{DynamicResource MetricValueTextStyle}"
+                                   VerticalAlignment="Bottom" />
+                        <TextBlock Text="分"
+                                   Style="{DynamicResource CaptionTextStyle}"
+                                   VerticalAlignment="Bottom"
+                                   Margin="4,0,0,4" />
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding Verdict}"
+                                   Style="{DynamicResource SectionTitleTextStyle}"
+                                   TextWrapping="Wrap"
+                                   Margin="0,0,0,4" />
+                        <TextBlock Text="{Binding SummaryText}"
+                                   Style="{DynamicResource CaptionTextStyle}"
+                                   TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding LastRunText}"
+                                   Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,0,0" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 行4 逐项结果 -->
+            <ItemsControl Grid.Row="4" ItemsSource="{Binding Items}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Vertical" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <!-- 每项一张卡片，项间距 12（GapMedium 的值；GapMedium 是 Double，
+                             不能直接当 Thickness 用，所以这里写字面量） -->
+                        <Border Style="{DynamicResource CardBorderStyle}" Margin="0,0,0,12">
+                            <StackPanel>
+                                <!-- 第一行：状态徽章 + 标题 + 右侧实测值 -->
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="{Binding StatusText}"
+                                               Style="{StaticResource HealthBadgeTextStyle}"
+                                               VerticalAlignment="Center"
+                                               Margin="0,0,12,0" />
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="{Binding Title}"
+                                               FontSize="{DynamicResource FontSizeLarge}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               VerticalAlignment="Center" />
+                                    <TextBlock DockPanel.Dock="Right"
+                                               Text="{Binding Detail}"
+                                               Foreground="{DynamicResource TextSecondaryBrush}"
+                                               FontSize="{DynamicResource FontSizeSmall}"
+                                               TextWrapping="Wrap"
+                                               TextAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               MaxWidth="420"
+                                               Margin="12,0,0,0" />
+                                </DockPanel>
+
+                                <!-- 第二行：建议动作（没有建议就不占位置） -->
+                                <TextBlock Text="{Binding Suggestion}"
+                                           Style="{DynamicResource CaptionTextStyle}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,8,0,0"
+                                           Visibility="{Binding HasSuggestion, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- 行5 「用 AI 解释」的结果。
+                 回复常有几百字，用 MessageBox 会很难看，所以给一块只读结果卡片；
+                 没有回复时整块 Collapsed，不占位置。 -->
+            <Border Grid.Row="5"
+                    Style="{DynamicResource CardBorderStyle}"
+                    Margin="0,0,0,12"
+                    Visibility="{Binding HasAiReply, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="AI 解读（来自 DeepSeek，仅供参考）"
+                                   Style="{DynamicResource SectionTitleTextStyle}"
+                                   VerticalAlignment="Center"
+                                   Margin="0" />
+                        <Button DockPanel.Dock="Right"
+                                Content="关闭"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding ClearAiReplyCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="收起并清空这块结果（不会改动任何本地数据）" />
+                        <Button DockPanel.Dock="Right"
+                                Content="复制"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding CopyAiReplyCommand}"
+                                ToolTip="把回复正文复制到剪贴板" />
+                    </DockPanel>
+
+                    <TextBox Text="{Binding AiReplyText, Mode=OneWay}"
+                             Style="{DynamicResource AppTextBoxStyle}"
+                             IsReadOnly="True"
+                             IsReadOnlyCaretVisible="False"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Disabled"
+                             MaxHeight="260" />
+                </StackPanel>
+            </Border>
+
+            <!-- 行6 底部状态 + 只读承诺 -->
+            <StackPanel Grid.Row="6" Margin="0,4,0,0">
+                <TextBlock Text="{Binding StatusText}"
+                           Style="{DynamicResource CaptionTextStyle}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding ScanOnlyNotice}"
+                           Style="{DynamicResource CaptionTextStyle}"
+                           Margin="0,4,0,0"
+                           TextWrapping="Wrap" />
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

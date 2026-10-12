@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>WinKit.Platform</RootNamespace>
+    <AssemblyName>WinKit.Platform</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 全部为 .NET Framework 自带程序集，不进输出目录 -->
+    <Reference Include="System.Management" />
+    <Reference Include="Microsoft.VisualBasic" />
+    <Reference Include="System.Runtime.Serialization" />
+    <!-- AI 模块用：HTTP 客户端与 DPAPI 加密。两者都是框架程序集，单文件承诺不受影响 -->
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Security" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WinKit.Core\WinKit.Core.csproj" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,20 @@
+<Application x:Class="WinKit.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <!--
+      刻意不设 StartupUri：主窗口在 App.OnStartup 里手工创建，
+      因为必须先完成「数据目录初始化 → headless 判定 → 单实例 → 主题」这几步。
+
+      MergedDictionaries 的顺序是契约，不能调整：
+        [0] Themes/Dark.xaml   —— ThemeManager 换肤时整体替换这一项（Light.xaml 键名完全一致）
+        [1] Themes/Controls.xaml —— 所有控件样式，一律用 DynamicResource 引用 [0] 里的键
+    -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Dark.xaml" />
+                <ResourceDictionary Source="Themes/Controls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

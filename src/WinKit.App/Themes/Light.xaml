@@ -1,0 +1,68 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- 浅色主题。键名必须与 Dark.xaml 完全一致。 -->
+
+    <Color x:Key="WindowBackgroundColor">#FFF4F5F7</Color>
+    <Color x:Key="SidebarBackgroundColor">#FFEAECEF</Color>
+    <Color x:Key="SurfaceColor">#FFFFFFFF</Color>
+    <Color x:Key="SurfaceAltColor">#FFF7F8FA</Color>
+    <Color x:Key="BorderColor">#FFDDE1E6</Color>
+    <Color x:Key="BorderStrongColor">#FFC3C9D1</Color>
+    <Color x:Key="TextPrimaryColor">#FF1F2329</Color>
+    <Color x:Key="TextSecondaryColor">#FF656D78</Color>
+    <Color x:Key="TextDisabledColor">#FFA5ACB5</Color>
+    <Color x:Key="AccentColor">#FF2B6FE0</Color>
+    <Color x:Key="AccentHoverColor">#FF3D82F0</Color>
+    <Color x:Key="AccentPressedColor">#FF1F5CC4</Color>
+    <Color x:Key="AccentTextColor">#FFFFFFFF</Color>
+    <Color x:Key="SelectionColor">#FFD6E4FF</Color>
+    <Color x:Key="HoverColor">#FFEDEFF3</Color>
+    <Color x:Key="SuccessColor">#FF2E9B6B</Color>
+    <Color x:Key="WarningColor">#FFC9821F</Color>
+    <Color x:Key="DangerColor">#FFD0453F</Color>
+    <Color x:Key="ChartCpuColor">#FF2B6FE0</Color>
+    <Color x:Key="ChartMemoryColor">#FF2E9B6B</Color>
+    <Color x:Key="ChartDiskColor">#FFC9821F</Color>
+    <Color x:Key="ChartNetworkColor">#FF8A5CC4</Color>
+    <Color x:Key="ChartGridColor">#FFE4E7EB</Color>
+
+    <SolidColorBrush x:Key="WindowBackgroundBrush" Color="{StaticResource WindowBackgroundColor}" />
+    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="{StaticResource SidebarBackgroundColor}" />
+    <SolidColorBrush x:Key="SurfaceBrush" Color="{StaticResource SurfaceColor}" />
+    <SolidColorBrush x:Key="SurfaceAltBrush" Color="{StaticResource SurfaceAltColor}" />
+    <SolidColorBrush x:Key="BorderBrush" Color="{StaticResource BorderColor}" />
+    <SolidColorBrush x:Key="BorderStrongBrush" Color="{StaticResource BorderStrongColor}" />
+    <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}" />
+    <SolidColorBrush x:Key="TextSecondaryBrush" Color="{StaticResource TextSecondaryColor}" />
+    <SolidColorBrush x:Key="TextDisabledBrush" Color="{StaticResource TextDisabledColor}" />
+    <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}" />
+    <SolidColorBrush x:Key="AccentHoverBrush" Color="{StaticResource AccentHoverColor}" />
+    <SolidColorBrush x:Key="AccentPressedBrush" Color="{StaticResource AccentPressedColor}" />
+    <SolidColorBrush x:Key="AccentTextBrush" Color="{StaticResource AccentTextColor}" />
+    <SolidColorBrush x:Key="SelectionBrush" Color="{StaticResource SelectionColor}" />
+    <SolidColorBrush x:Key="HoverBrush" Color="{StaticResource HoverColor}" />
+    <SolidColorBrush x:Key="SuccessBrush" Color="{StaticResource SuccessColor}" />
+    <SolidColorBrush x:Key="WarningBrush" Color="{StaticResource WarningColor}" />
+    <SolidColorBrush x:Key="DangerBrush" Color="{StaticResource DangerColor}" />
+    <SolidColorBrush x:Key="ChartCpuBrush" Color="{StaticResource ChartCpuColor}" />
+    <SolidColorBrush x:Key="ChartMemoryBrush" Color="{StaticResource ChartMemoryColor}" />
+    <SolidColorBrush x:Key="ChartDiskBrush" Color="{StaticResource ChartDiskColor}" />
+    <SolidColorBrush x:Key="ChartNetworkBrush" Color="{StaticResource ChartNetworkColor}" />
+    <SolidColorBrush x:Key="ChartGridBrush" Color="{StaticResource ChartGridColor}" />
+
+    <FontFamily x:Key="AppFontFamily">Microsoft YaHei UI, Segoe UI, sans-serif</FontFamily>
+    <FontFamily x:Key="AppMonoFontFamily">Consolas, Courier New, monospace</FontFamily>
+    <sys:Double x:Key="FontSizeSmall">11.5</sys:Double>
+    <sys:Double x:Key="FontSizeNormal">12.5</sys:Double>
+    <sys:Double x:Key="FontSizeLarge">15</sys:Double>
+    <sys:Double x:Key="FontSizeTitle">19</sys:Double>
+    <sys:Double x:Key="FontSizeMetric">26</sys:Double>
+    <CornerRadius x:Key="CornerRadiusSmall">3</CornerRadius>
+    <CornerRadius x:Key="CornerRadiusMedium">6</CornerRadius>
+    <Thickness x:Key="CardPadding">14</Thickness>
+    <sys:Double x:Key="GapSmall">6</sys:Double>
+    <sys:Double x:Key="GapMedium">12</sys:Double>
+
+</ResourceDictionary>

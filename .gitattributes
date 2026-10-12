@@ -1,0 +1,16 @@
+# 统一换行符，避免 Windows 上出现大量 CRLF 警告
+* text=auto
+
+*.cs      text diff=csharp
+*.xaml    text
+*.csproj  text
+*.props   text
+*.sln     text eol=crlf
+*.ps1     text eol=crlf
+*.md      text
+*.json    text
+
+*.exe     binary
+*.dll     binary
+*.ico     binary
+*.png     binary

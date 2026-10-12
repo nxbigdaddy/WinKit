@@ -1,0 +1,296 @@
+<UserControl x:Class="WinKit.App.Views.Pages.DashboardPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:WinKit.App.Controls"
+             xmlns:vm="clr-namespace:WinKit.App.ViewModels"
+             Background="{DynamicResource WindowBackgroundBrush}">
+
+    <UserControl.Resources>
+        <!-- WPF 自带的转换器，不需要第三方库；用来按加载状态切换提示文字 -->
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <!-- 磁盘吞吐不可用时的降级提示要反着来，复用 ViewModels\Converters.cs 里的实现（不重复定义同名 x:Key） -->
+        <vm:BoolToVisibilityInverted x:Key="BoolToVisibilityInverted" />
+    </UserControl.Resources>
+
+    <!--
+      总览页。全部数值由 DashboardViewModel 提供，折线图由 code-behind 订阅 MetricsUpdated 后 Push。
+      只用 Themes 里已定义的具名样式/画刷键，避免运行期找不到资源。
+    -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled">
+        <Border Padding="16">
+        <StackPanel>
+
+            <TextBlock Text="总览" Style="{DynamicResource PageTitleTextStyle}" />
+
+            <!-- 第一行：三个实时指标卡片（CPU / 内存 / 网络） -->
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- CPU -->
+                <Border Grid.Column="0" Style="{DynamicResource CardBorderStyle}">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="CPU 使用率" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding CpuText}" Style="{DynamicResource MetricValueTextStyle}"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                        <controls:SparklineChart x:Name="CpuChart"
+                                                 Margin="0,10,0,0"
+                                                 Title="CPU 使用率"
+                                                 MaxValue="100"
+                                                 Stroke="{DynamicResource ChartCpuBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 内存 -->
+                <Border Grid.Column="1" Margin="12,0,0,0" Style="{DynamicResource CardBorderStyle}">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="内存使用率" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding MemoryText}" Style="{DynamicResource MetricValueTextStyle}"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                        <TextBlock Text="{Binding MemoryDetailText}" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,6,0,0" />
+                        <controls:SparklineChart x:Name="MemoryChart"
+                                                 Margin="0,10,0,0"
+                                                 Title="内存使用率"
+                                                 MaxValue="100"
+                                                 Stroke="{DynamicResource ChartMemoryBrush}" />
+                    </StackPanel>
+                </Border>
+
+                <!-- 网络 -->
+                <Border Grid.Column="2" Margin="12,0,0,0" Style="{DynamicResource CardBorderStyle}">
+                    <StackPanel>
+                        <Grid>
+                            <TextBlock Text="网络吞吐" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding NetworkText}" Style="{DynamicResource MetricValueTextStyle}"
+                                       FontSize="{DynamicResource FontSizeTitle}"
+                                       HorizontalAlignment="Right" />
+                        </Grid>
+                        <controls:SparklineChart x:Name="NetworkChart"
+                                                 Margin="0,10,0,0"
+                                                 Title="网络下行速率"
+                                                 AutoScale="True"
+                                                 MaxValue="1024"
+                                                 Stroke="{DynamicResource ChartNetworkBrush}" />
+                    </StackPanel>
+                </Border>
+
+            </Grid>
+
+            <!-- 第二行：系统盘 -->
+            <Border Margin="0,12,0,0" Style="{DynamicResource CardBorderStyle}">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="系统盘" Style="{DynamicResource CaptionTextStyle}" />
+                        <TextBlock Text="{Binding PrimaryDiskName}" Style="{DynamicResource CaptionTextStyle}"
+                                   HorizontalAlignment="Right" />
+                    </Grid>
+                    <TextBlock Text="{Binding PrimaryDiskFreeText}" Style="{DynamicResource MetricValueTextStyle}"
+                               FontSize="{DynamicResource FontSizeTitle}" Margin="0,8,0,0" />
+                    <ProgressBar Value="{Binding PrimaryDiskUsedPercent, Mode=OneWay}"
+                                 Maximum="100"
+                                 Margin="0,12,0,0"
+                                 Foreground="{DynamicResource ChartDiskBrush}" />
+                    <TextBlock Text="{Binding PrimaryDiskDetailText}" Style="{DynamicResource CaptionTextStyle}"
+                               Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- 第三行：磁盘读写（整行宽，两张曲线并排；1/4 宽的卡片放不下这个字符串） -->
+            <Border Margin="0,12,0,0" Style="{DynamicResource CardBorderStyle}">
+                <StackPanel MinHeight="150">
+                    <TextBlock Text="磁盘读写" Style="{DynamicResource CaptionTextStyle}" />
+
+                    <!-- 读写速率字符串比 "6.3 %" 长得多，不用 FontSizeMetric(26px)，降到 FontSizeTitle 并允许省略 -->
+                    <TextBlock Text="{Binding DiskIoText}" Style="{DynamicResource MetricValueTextStyle}"
+                               FontSize="{DynamicResource FontSizeTitle}"
+                               Margin="0,8,0,0"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding DiskIoText}" />
+
+                    <StackPanel Visibility="{Binding DiskIoAvailable, Converter={StaticResource BoolToVisibility}}">
+                        <Grid Margin="0,12,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="读" Style="{DynamicResource CaptionTextStyle}"
+                                       Foreground="{DynamicResource ChartCpuBrush}" />
+                            <TextBlock Grid.Column="1" Text="写" Style="{DynamicResource CaptionTextStyle}"
+                                       Margin="12,0,0,0" Foreground="{DynamicResource ChartDiskBrush}" />
+                        </Grid>
+
+                        <Grid Margin="0,2,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <controls:SparklineChart x:Name="DiskReadChart"
+                                                     Grid.Column="0"
+                                                     Height="48"
+                                                     Title="磁盘读取速率"
+                                                     AutoScale="True"
+                                                     MaxValue="1024"
+                                                     Stroke="{DynamicResource ChartCpuBrush}" />
+                            <controls:SparklineChart x:Name="DiskWriteChart"
+                                                     Grid.Column="1"
+                                                     Margin="12,0,0,0"
+                                                     Height="48"
+                                                     Title="磁盘写入速率"
+                                                     AutoScale="True"
+                                                     MaxValue="1024"
+                                                     Stroke="{DynamicResource ChartDiskBrush}" />
+                        </Grid>
+
+                        <TextBlock Text="{Binding DiskIoDetailText}" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,6,0,0"
+                                   TextTrimming="CharacterEllipsis"
+                                   ToolTip="{Binding DiskIoDetailText}" />
+                    </StackPanel>
+
+                    <!-- 降级路径：计数器不可用时隐藏两张图，只留一行说明，绝不画 0 值曲线 -->
+                    <TextBlock Text="磁盘吞吐不可用" Style="{DynamicResource CaptionTextStyle}"
+                               Margin="0,12,0,0"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip="{Binding DiskIoDetailText}"
+                               Visibility="{Binding DiskIoAvailable, Converter={StaticResource BoolToVisibilityInverted}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 第四行：系统信息 -->
+            <Border Margin="0,12,0,0" Style="{DynamicResource CardBorderStyle}">
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="系统信息" Style="{DynamicResource SectionTitleTextStyle}" />
+                        <TextBlock Text="正在读取硬件信息…" Style="{DynamicResource CaptionTextStyle}"
+                                   HorizontalAlignment="Right" VerticalAlignment="Center"
+                                   Visibility="{Binding IsLoadingInfo, Converter={StaticResource BoolToVisibility}}" />
+                    </Grid>
+
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" MinWidth="86" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" MinWidth="86" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="操作系统" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding OsText}" TextWrapping="Wrap"
+                                   ToolTip="{Binding OsText}" Margin="0,4,18,4" />
+
+                        <TextBlock Grid.Row="0" Grid.Column="2" Text="处理器" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="0" Grid.Column="3" Text="{Binding CpuInfoText}" TextWrapping="Wrap"
+                                   ToolTip="{Binding CpuInfoText}" Margin="0,4,0,4" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="内存" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding MemoryInfoText}" TextWrapping="Wrap"
+                                   ToolTip="{Binding MemoryInfoText}" Margin="0,4,18,4" />
+
+                        <TextBlock Grid.Row="1" Grid.Column="2" Text="主板" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="1" Grid.Column="3" Text="{Binding BoardText}" TextWrapping="Wrap"
+                                   ToolTip="{Binding BoardText}" Margin="0,4,0,4" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="显卡" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding GpuText}" TextWrapping="Wrap"
+                                   ToolTip="{Binding GpuText}" Margin="0,4,18,4" />
+
+                        <TextBlock Grid.Row="2" Grid.Column="2" Text="BIOS" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="2" Grid.Column="3" Text="{Binding BiosText}" TextWrapping="Wrap"
+                                   ToolTip="{Binding BiosText}" Margin="0,4,0,4" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="0" Text="计算机名" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding MachineText}" TextWrapping="Wrap"
+                                   ToolTip="{Binding MachineText}" Margin="0,4,18,4" />
+
+                        <TextBlock Grid.Row="3" Grid.Column="2" Text="内存条" Style="{DynamicResource CaptionTextStyle}"
+                                   Margin="0,4,10,4" VerticalAlignment="Top" />
+                        <TextBlock Grid.Row="3" Grid.Column="3" Text="{Binding MemoryModulesText}" TextWrapping="Wrap"
+                                   FontFamily="{DynamicResource AppMonoFontFamily}" FontSize="{DynamicResource FontSizeSmall}"
+                                   ToolTip="{Binding MemoryModulesText}" Margin="0,4,0,4" />
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- 第五行：磁盘列表 -->
+            <Border Margin="0,12,0,0" Style="{DynamicResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="磁盘" Style="{DynamicResource SectionTitleTextStyle}" />
+                    <DataGrid ItemsSource="{Binding Disks}"
+                              Style="{DynamicResource AppDataGridStyle}"
+                              ColumnHeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                              RowStyle="{DynamicResource AppDataGridRowStyle}"
+                              CellStyle="{DynamicResource AppDataGridCellStyle}"
+                              MaxHeight="240">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="卷标" Width="2*" Binding="{Binding Display}" />
+                            <DataGridTextColumn Header="文件系统" Width="1*" Binding="{Binding FileSystem}" />
+                            <DataGridTextColumn Header="总容量" Width="1*" Binding="{Binding TotalText}" />
+                            <DataGridTextColumn Header="剩余空间" Width="1*" Binding="{Binding FreeText}" />
+                            <DataGridTemplateColumn Header="使用率" Width="2*">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ProgressBar Grid.Column="0" Width="110" Height="6"
+                                                         HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                         Maximum="100"
+                                                         Value="{Binding UsedPercent, Mode=OneWay}"
+                                                         Foreground="{DynamicResource ChartDiskBrush}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding UsedPercentText}"
+                                                       Style="{DynamicResource CaptionTextStyle}"
+                                                       VerticalAlignment="Center" Margin="8,0,0,0" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+
+            <!-- 底部操作行 -->
+            <Grid Margin="2,12,2,0">
+                <TextBlock Text="{Binding LastUpdateText}" Style="{DynamicResource CaptionTextStyle}"
+                           TextWrapping="Wrap" VerticalAlignment="Center" Margin="0,0,12,0" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="刷新硬件信息"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Command="{Binding RefreshInfoCommand}" />
+                    <Button Content="复制系统信息"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Margin="8,0,0,0"
+                            Command="{Binding CopyInfoCommand}" />
+                </StackPanel>
+            </Grid>
+
+        </StackPanel>
+        </Border>
+    </ScrollViewer>
+</UserControl>

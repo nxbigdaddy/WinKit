@@ -1,0 +1,471 @@
+<UserControl x:Class="WinKit.App.Views.Pages.CleanupPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinKit.App.ViewModels"
+             Background="{DynamicResource WindowBackgroundBrush}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontSize="{DynamicResource FontSizeNormal}"
+             Foreground="{DynamicResource TextPrimaryBrush}">
+    <UserControl.Resources>
+        <!-- 本页共用的转换器。BoolToVisibility 来自 ViewModels\Converters.cs，不在这里重复造 -->
+        <vm:BoolToVisibility x:Key="BoolToVisibility" />
+
+        <!-- 单元格：左对齐 + 超长省略号 + 悬停看全文。
+             AppDataGridCellStyle 的 TargetType 是 DataGridCell，不能拿来当 ElementStyle，
+             所以列模板统一用这里自定义的 TextBlock 样式。 -->
+        <Style x:Key="CleanupCellTextStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+        </Style>
+
+        <!-- 大小列右对齐，位数才能对齐着看 -->
+        <Style x:Key="CleanupCellNumberStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+        </Style>
+
+        <!--
+            处置方式用的单选按钮。这里刻意**不复用 AppCheckBoxStyle**：
+            那个样式的 TargetType 是 CheckBox，贴到 RadioButton 上属于靠派生关系侥幸通过，
+            本页自己声明一个 TargetType="RadioButton" 的样式更稳，也免得和将来给 CheckBox 加的模板打架。
+        -->
+        <Style x:Key="CleanupChoiceStyle" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
+            <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}" />
+            <Setter Property="FontSize" Value="{DynamicResource FontSizeNormal}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+    </UserControl.Resources>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                  HorizontalScrollBarVisibility="Disabled"
+                  Padding="16">
+        <StackPanel>
+
+            <!-- ============================ 1) 页头 ============================ -->
+            <Grid Margin="0,0,0,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <TextBlock Grid.Column="0"
+                           Text="垃圾清理"
+                           Style="{DynamicResource PageTitleTextStyle}"
+                           VerticalAlignment="Center"
+                           Margin="0" />
+
+                <TextBlock Grid.Column="1"
+                           Text="先扫描预览，再决定删什么。默认移入隔离区，随时可以一键还原。"
+                           Style="{DynamicResource CaptionTextStyle}"
+                           VerticalAlignment="Center"
+                           Margin="12,0,12,0"
+                           TextTrimming="CharacterEllipsis" />
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="扫描"
+                            Style="{DynamicResource PrimaryButtonStyle}"
+                            Command="{Binding ScanCommand}"
+                            ToolTip="列出可清理的候选文件。扫描本身不会删除任何东西。" />
+                    <Button Content="取消"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Command="{Binding CancelCommand}"
+                            Margin="8,0,0,0"
+                            ToolTip="停止正在进行的扫描或清理" />
+                </StackPanel>
+            </Grid>
+
+            <!-- ============================ 2) 只读审计提示条 ============================ -->
+            <Border Margin="0,0,0,12"
+                    Background="{DynamicResource SurfaceAltBrush}"
+                    BorderBrush="{DynamicResource WarningBrush}"
+                    BorderThickness="4,0,0,0"
+                    CornerRadius="{DynamicResource CornerRadiusSmall}"
+                    Padding="12,8"
+                    Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVisibility}}">
+                <TextBlock Text="{Binding ReadOnlyNotice}"
+                           Foreground="{DynamicResource WarningBrush}"
+                           TextWrapping="Wrap" />
+            </Border>
+
+            <!-- ============================ 3) 进度条 ============================ -->
+            <StackPanel Margin="0,0,0,12"
+                        Visibility="{Binding ShowProgress, Converter={StaticResource BoolToVisibility}}">
+                <ProgressBar Style="{DynamicResource AppProgressBarStyle}"
+                             Value="{Binding ProgressPercent, Mode=OneWay}"
+                             Minimum="0"
+                             Maximum="100" />
+                <TextBlock Text="{Binding ProgressText}"
+                           Style="{DynamicResource CaptionTextStyle}"
+                           Margin="0,6,0,0"
+                           TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+
+            <!-- ============================ 4) 清理规则卡片 ============================ -->
+            <Border Style="{DynamicResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="清理规则" Style="{DynamicResource SectionTitleTextStyle}" Margin="0,0,0,4" />
+                    <TextBlock Text="勾选要扫描的类别。每一项都写明了它是什么、清了有什么影响。"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               Margin="0,0,0,10" />
+
+                    <ItemsControl ItemsSource="{Binding Rules}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource SurfaceAltBrush}"
+                                        CornerRadius="{DynamicResource CornerRadiusSmall}"
+                                        Padding="10,8"
+                                        Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <!-- 第一行：勾选 + 名称 + 权限标记 + 扫描结果 -->
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="Auto" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+
+                                            <CheckBox Grid.Column="0"
+                                                      Style="{DynamicResource AppCheckBoxStyle}"
+                                                      IsChecked="{Binding IsEnabled, Mode=TwoWay}"
+                                                      VerticalAlignment="Center"
+                                                      ToolTip="取消勾选可跳过这一类" />
+
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding Name}"
+                                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                                       FontWeight="SemiBold"
+                                                       VerticalAlignment="Center"
+                                                       Margin="8,0,0,0" />
+
+                                            <!-- 需要管理员：Segoe MDL2 的锁形图标 + 小字提示 -->
+                                            <StackPanel Grid.Column="2"
+                                                        Orientation="Horizontal"
+                                                        VerticalAlignment="Center"
+                                                        Margin="8,0,0,0"
+                                                        Visibility="{Binding RequiresAdmin, Converter={StaticResource BoolToVisibility}}">
+                                                <TextBlock Text="&#xE72E;"
+                                                           FontFamily="Segoe MDL2 Assets"
+                                                           FontSize="{DynamicResource FontSizeSmall}"
+                                                           Foreground="{DynamicResource WarningBrush}"
+                                                           VerticalAlignment="Center" />
+                                                <TextBlock Text="需要管理员"
+                                                           Style="{DynamicResource CaptionTextStyle}"
+                                                           Foreground="{DynamicResource WarningBrush}"
+                                                           VerticalAlignment="Center"
+                                                           Margin="4,0,0,0" />
+                                            </StackPanel>
+
+                                            <TextBlock Grid.Column="4"
+                                                       Text="{Binding SummaryText}"
+                                                       Style="{DynamicResource CaptionTextStyle}"
+                                                       HorizontalAlignment="Right"
+                                                       VerticalAlignment="Center"
+                                                       Margin="12,0,0,0"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       ToolTip="{Binding AdminHint}" />
+                                        </Grid>
+
+                                        <!-- 第二行起：这是什么 / 清掉有什么影响 -->
+                                        <TextBlock Text="{Binding Description}"
+                                                   Style="{DynamicResource CaptionTextStyle}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="26,4,0,0" />
+                                        <TextBlock Text="{Binding Impact, StringFormat='影响：{0}'}"
+                                                   Style="{DynamicResource CaptionTextStyle}"
+                                                   TextWrapping="Wrap"
+                                                   Margin="26,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- 会联网的功能：入口放在规则卡片里，因为分析的对象就是上面勾选的这些规则。
+                         刻意不塞进顶部工具栏 —— 那里是本地扫描/取消的家。 -->
+                    <Button Content="用 AI 分析规则"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Command="{Binding AnalyzeRulesWithAiCommand}"
+                            HorizontalAlignment="Left"
+                            Margin="0,4,0,0"
+                            ToolTip="会联网（DeepSeek）：点「确定」前会先显示将要发送的全部内容。只发送规则名称、说明与数量统计，不含任何文件路径。" />
+
+                    <TextBlock Text="{Binding AiAvailabilityHint}"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- ============================ 4.5) AI 分析结果 ============================ -->
+            <!-- 回复常有几百字，用只读结果卡片而不是 MessageBox；没有回复时整块 Collapsed。 -->
+            <Border Style="{DynamicResource CardBorderStyle}"
+                    Margin="0,0,0,12"
+                    Visibility="{Binding HasAiReply, Converter={StaticResource BoolToVisibility}}">
+                <StackPanel>
+                    <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="AI 分析（来自 DeepSeek，仅供参考）"
+                                   Style="{DynamicResource SectionTitleTextStyle}"
+                                   VerticalAlignment="Center"
+                                   Margin="0" />
+                        <Button DockPanel.Dock="Right"
+                                Content="关闭"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding ClearAiReplyCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="收起并清空这块结果（不会扫描或删除任何东西）" />
+                        <Button DockPanel.Dock="Right"
+                                Content="复制"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding CopyAiReplyCommand}"
+                                ToolTip="把回复正文复制到剪贴板" />
+                    </DockPanel>
+
+                    <TextBox Text="{Binding AiReplyText, Mode=OneWay}"
+                             Style="{DynamicResource AppTextBoxStyle}"
+                             IsReadOnly="True"
+                             IsReadOnlyCaretVisible="False"
+                             AcceptsReturn="True"
+                             TextWrapping="Wrap"
+                             VerticalScrollBarVisibility="Auto"
+                             HorizontalScrollBarVisibility="Disabled"
+                             MaxHeight="260" />
+
+                    <TextBlock Text="AI 的建议只针对规则类别，不针对你机器上的具体文件；真正要不要清，仍以上面的候选清单为准。"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,6,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- ============================ 5) 处置方式卡片 ============================ -->
+            <Border Style="{DynamicResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="处置方式" Style="{DynamicResource SectionTitleTextStyle}" Margin="0,0,0,8" />
+
+                    <RadioButton GroupName="CleanupDisposal"
+                                 Style="{StaticResource CleanupChoiceStyle}"
+                                 Content="隔离区（推荐，可一键撤销）"
+                                 IsChecked="{Binding UseQuarantine, Mode=TwoWay}"
+                                 Margin="0,0,0,6" />
+
+                    <RadioButton GroupName="CleanupDisposal"
+                                 Style="{StaticResource CleanupChoiceStyle}"
+                                 Content="Windows 回收站（WinKit 内不可撤销）"
+                                 IsChecked="{Binding UseRecycleBin, Mode=TwoWay}"
+                                 Margin="0,0,0,6" />
+
+                    <RadioButton GroupName="CleanupDisposal"
+                                 Style="{StaticResource CleanupChoiceStyle}"
+                                 Foreground="{DynamicResource DangerBrush}"
+                                 Content="彻底删除（不可恢复）"
+                                 IsChecked="{Binding UsePermanent, Mode=TwoWay}" />
+
+                    <TextBlock Text="三种方式的差别：隔离区把文件搬到 WinKit 数据目录，撤销就是搬回来，最稳妥；回收站直接交给 Windows，但 WinKit 无法撤销；彻底删除不经过回收站，删掉就找不回来了。"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,8,0,0" />
+                    <TextBlock Text="{Binding DisposalExplanation, StringFormat=当前选择：{0}}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{DynamicResource FontSizeSmall}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0" />
+                    <TextBlock Text="{Binding ElevationHint}"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               Foreground="{DynamicResource WarningBrush}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0" />
+                </StackPanel>
+            </Border>
+
+            <!-- ============================ 6) 待清理项卡片 ============================ -->
+            <Border Style="{DynamicResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,8" LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="待清理项"
+                                   Style="{DynamicResource SectionTitleTextStyle}"
+                                   VerticalAlignment="Center" />
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="{Binding SelectedSummary}"
+                                   Style="{DynamicResource CaptionTextStyle}"
+                                   VerticalAlignment="Center"
+                                   Margin="12,0,0,0" />
+                        <Button DockPanel.Dock="Right"
+                                Content="全不选"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding SelectNoneCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="取消勾选全部候选（它们仍留在磁盘上）" />
+                        <Button DockPanel.Dock="Right"
+                                Content="全选"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding SelectAllCommand}"
+                                ToolTip="勾选全部扫描出来的候选" />
+                    </DockPanel>
+
+                    <DataGrid Style="{DynamicResource AppDataGridStyle}"
+                              RowStyle="{StaticResource AppDataGridRowStyle}"
+                              ItemsSource="{Binding Candidates}"
+                              IsReadOnly="False"
+                              CanUserSortColumns="True"
+                              Height="320"
+                              ToolTip="列表里的每一项都会被逐条列出：文件路径、大小、最后修改时间。没勾选的项不会被删除。">
+                        <DataGrid.Columns>
+                            <!-- 勾选列用模板列而不是 DataGridCheckBoxColumn：
+                                 后者要双击才进入编辑态，勾选反馈很别扭；这里一次点击就生效，
+                                 并且会立刻刷新上面的"已选中 N 项"。 -->
+                            <DataGridTemplateColumn Header="选择"
+                                                    Width="60"
+                                                    CanUserSort="False"
+                                                    HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                                    CellStyle="{StaticResource AppDataGridCellStyle}">
+                                <DataGridTemplateColumn.CellTemplate>
+                                    <DataTemplate>
+                                        <CheckBox Style="{DynamicResource AppCheckBoxStyle}"
+                                                  IsChecked="{Binding Selected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center" />
+                                    </DataTemplate>
+                                </DataGridTemplateColumn.CellTemplate>
+                            </DataGridTemplateColumn>
+
+                            <DataGridTextColumn Header="规则"
+                                                Binding="{Binding RuleName}"
+                                                SortMemberPath="RuleName"
+                                                Width="140"
+                                                HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                                ElementStyle="{StaticResource CleanupCellTextStyle}" />
+
+                            <DataGridTextColumn Header="路径"
+                                                Binding="{Binding Path}"
+                                                SortMemberPath="Path"
+                                                Width="2*"
+                                                MinWidth="200"
+                                                HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                                ElementStyle="{StaticResource CleanupCellTextStyle}" />
+
+                            <DataGridTextColumn Header="大小"
+                                                Binding="{Binding SizeText}"
+                                                SortMemberPath="Candidate.Size"
+                                                Width="100"
+                                                HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                                ElementStyle="{StaticResource CleanupCellNumberStyle}" />
+
+                            <DataGridTextColumn Header="修改时间"
+                                                Binding="{Binding LastWriteText}"
+                                                SortMemberPath="LastWriteText"
+                                                Width="150"
+                                                HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                                ElementStyle="{StaticResource CleanupCellTextStyle}" />
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
+
+            <!-- ============================ 7) 执行行 ============================ -->
+            <Border Style="{DynamicResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <DockPanel LastChildFill="False">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="执行"
+                                   Style="{DynamicResource SectionTitleTextStyle}"
+                                   VerticalAlignment="Center" />
+                        <Button DockPanel.Dock="Right"
+                                Content="撤销上一次清理"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding UndoLastCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="把上一次清理移入隔离区的内容搬回原位置（仅隔离区方式可撤销）" />
+                        <Button DockPanel.Dock="Right"
+                                Content="以管理员身份清理"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding ElevateAndCleanCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="只清理选中项里需要管理员权限的那些：会弹出 UAC 授权窗口，清理结果同样可在撤销中心还原" />
+                        <Button DockPanel.Dock="Right"
+                                Content="执行清理"
+                                Style="{DynamicResource PrimaryButtonStyle}"
+                                Command="{Binding ExecuteCommand}"
+                                ToolTip="清理上面勾选的项。执行前会弹出确认框，逐条说明影响。" />
+                    </DockPanel>
+
+                    <TextBlock Text="{Binding StatusText}"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,10,0,0" />
+
+                    <TextBlock Text="{Binding LastResultText}"
+                               Foreground="{DynamicResource TextSecondaryBrush}"
+                               FontSize="{DynamicResource FontSizeSmall}"
+                               TextWrapping="Wrap"
+                               Margin="0,4,0,0"
+                               Visibility="{Binding HasLastResult, Converter={StaticResource BoolToVisibility}}" />
+                </StackPanel>
+            </Border>
+
+            <!-- ============================ 8) 隔离区卡片 ============================ -->
+            <Border Style="{DynamicResource CardBorderStyle}" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="WinKit 隔离区" Style="{DynamicResource SectionTitleTextStyle}" Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding QuarantineInfoText}"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8" />
+                    <TextBlock Text="用隔离区方式清理掉的文件都存放在这里，撤销就是把它们搬回原位置。清空隔离区会永久删除这些内容。"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="打开隔离区目录"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding OpenQuarantineFolderCommand}"
+                                ToolTip="在资源管理器里查看隔离区里的文件" />
+                        <Button Content="清空隔离区"
+                                Style="{DynamicResource DangerButtonStyle}"
+                                Command="{Binding PurgeQuarantineCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="永久删除隔离区里的所有内容（需要连续两次确认）" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- ============================ 9) 回收站卡片 ============================ -->
+            <Border Style="{DynamicResource CardBorderStyle}">
+                <StackPanel>
+                    <TextBlock Text="Windows 回收站" Style="{DynamicResource SectionTitleTextStyle}" Margin="0,0,0,6" />
+                    <TextBlock Text="{Binding RecycleBinInfoText}"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8" />
+                    <TextBlock Text="以回收站方式清理的项会进入 Windows 回收站，WinKit 内无法撤销，需要到回收站手动还原。"
+                               Style="{DynamicResource CaptionTextStyle}"
+                               TextWrapping="Wrap"
+                               Margin="0,0,0,8" />
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="刷新"
+                                Style="{DynamicResource SecondaryButtonStyle}"
+                                Command="{Binding RefreshStorageCommand}"
+                                ToolTip="重新读取隔离区与回收站的大小" />
+                        <Button Content="清空回收站"
+                                Style="{DynamicResource DangerButtonStyle}"
+                                Command="{Binding EmptyRecycleBinCommand}"
+                                Margin="8,0,0,0"
+                                ToolTip="永久删除回收站里的所有内容，不可撤销" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

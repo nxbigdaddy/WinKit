@@ -1,0 +1,231 @@
+<UserControl x:Class="WinKit.App.Views.Pages.JournalPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinKit.App.ViewModels"
+             Loaded="OnLoaded">
+
+    <UserControl.Resources>
+        <!-- 本页自己用的可见性转换器（AI 结果卡片靠它折叠）。
+             类型定义在 ViewModels\Converters.cs，资源键必须在使用它的页面里声明一次。 -->
+        <vm:BoolToVisibility x:Key="BoolToVisibility" />
+    </UserControl.Resources>
+
+    <Grid Background="{DynamicResource WindowBackgroundBrush}" Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 行0 工具条 -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,12" LastChildFill="False">
+            <TextBlock DockPanel.Dock="Left"
+                       Text="撤销中心"
+                       Style="{StaticResource PageTitleTextStyle}"
+                       Margin="0" />
+            <TextBlock DockPanel.Dock="Left"
+                       Text="{Binding UndoableTotalText}"
+                       Style="{StaticResource CaptionTextStyle}"
+                       Margin="12,0,0,2"
+                       VerticalAlignment="Center" />
+            <Button DockPanel.Dock="Right"
+                    Content="刷新"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Command="{Binding RefreshCommand}"
+                    Margin="8,0,0,0" />
+            <Button DockPanel.Dock="Right"
+                    Content="打开日志文件位置"
+                    Style="{StaticResource SecondaryButtonStyle}"
+                    Command="{Binding OpenJournalFolderCommand}" />
+        </DockPanel>
+
+        <!-- 行1 主体：左批次列表 / 右批次明细 -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="300" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <Border Grid.Column="0"
+                    Style="{StaticResource CardBorderStyle}"
+                    Padding="6"
+                    Margin="0,0,12,0">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top"
+                               Text="操作批次"
+                               Style="{StaticResource SectionTitleTextStyle}" />
+                    <ListBox x:Name="BatchList"
+                             Style="{StaticResource NavListBoxStyle}"
+                             ItemContainerStyle="{StaticResource NavListBoxItemStyle}"
+                             ItemsSource="{Binding Batches}"
+                             SelectedItem="{Binding SelectedBatch, Mode=TwoWay}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding TimeText}"
+                                               FontFamily="{DynamicResource AppMonoFontFamily}"
+                                               Foreground="{DynamicResource TextPrimaryBrush}"
+                                               FontSize="{DynamicResource FontSizeSmall}"
+                                               TextTrimming="CharacterEllipsis" />
+                                    <DockPanel Margin="0,2,0,0" LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                                   Text="{Binding TaskText}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{DynamicResource FontSizeSmall}"
+                                                   TextTrimming="CharacterEllipsis" />
+                                        <TextBlock DockPanel.Dock="Right"
+                                                   Text="{Binding CountText}"
+                                                   Foreground="{DynamicResource TextSecondaryBrush}"
+                                                   FontSize="{DynamicResource FontSizeSmall}"
+                                                   Margin="8,0,0,0" />
+                                    </DockPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </Border>
+
+            <DataGrid Grid.Column="1"
+                      Style="{StaticResource AppDataGridStyle}"
+                      RowStyle="{StaticResource AppDataGridRowStyle}"
+                      CellStyle="{StaticResource AppDataGridCellStyle}"
+                      ItemsSource="{Binding Entries}">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="时间"
+                                        Width="140"
+                                        Binding="{Binding TimeText}"
+                                        HeaderStyle="{StaticResource AppDataGridColumnHeaderStyle}" />
+                    <DataGridTextColumn Header="动作"
+                                        Width="100"
+                                        Binding="{Binding Action}"
+                                        HeaderStyle="{StaticResource AppDataGridColumnHeaderStyle}" />
+                    <DataGridTextColumn Header="目标"
+                                        Width="*"
+                                        Binding="{Binding Target}"
+                                        HeaderStyle="{StaticResource AppDataGridColumnHeaderStyle}" />
+                    <DataGridTextColumn Header="大小"
+                                        Width="80"
+                                        Binding="{Binding SizeText}"
+                                        HeaderStyle="{StaticResource AppDataGridColumnHeaderStyle}" />
+                    <DataGridTextColumn Header="级别"
+                                        Width="60"
+                                        Binding="{Binding Level}"
+                                        HeaderStyle="{StaticResource AppDataGridColumnHeaderStyle}" />
+                    <DataGridTextColumn Header="结果"
+                                        Width="70"
+                                        Binding="{Binding Result}"
+                                        HeaderStyle="{StaticResource AppDataGridColumnHeaderStyle}" />
+                    <DataGridTemplateColumn Header="撤销状态"
+                                            Width="90"
+                                            HeaderStyle="{StaticResource AppDataGridColumnHeaderStyle}">
+                        <DataGridTemplateColumn.CellTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding UndoText}" VerticalAlignment="Center">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Undoable}" Value="True">
+                                                    <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+        </Grid>
+
+        <!-- 行2 底部操作 -->
+        <DockPanel Grid.Row="2" Margin="0,12,0,0" LastChildFill="False">
+            <Button DockPanel.Dock="Left"
+                    Content="撤销选中批次"
+                    Style="{StaticResource DangerButtonStyle}"
+                    Command="{Binding UndoBatchCommand}"
+                    MinWidth="120" />
+            <TextBlock DockPanel.Dock="Left"
+                       Text="{Binding SelectedBatchText}"
+                       Style="{StaticResource CaptionTextStyle}"
+                       Margin="12,0,0,0"
+                       VerticalAlignment="Center" />
+            <TextBlock DockPanel.Dock="Right"
+                       Text="{Binding StatusText}"
+                       Style="{StaticResource CaptionTextStyle}"
+                       VerticalAlignment="Center"
+                       TextTrimming="CharacterEllipsis" />
+        </DockPanel>
+
+        <!-- 行3 说明条 -->
+        <Border Grid.Row="3"
+                Style="{StaticResource CardBorderStyle}"
+                Padding="10,8"
+                Margin="0,10,0,0">
+            <StackPanel>
+                <TextBlock Text="操作撤销依赖操作日志：删到回收站的文件需从回收站还原；移动 / 重命名可直接搬回原位置。"
+                           Style="{StaticResource CaptionTextStyle}"
+                           TextWrapping="Wrap" />
+                <TextBlock Text="{Binding JournalPathText, StringFormat='日志文件：{0}'}"
+                           Style="{StaticResource CaptionTextStyle}"
+                           Margin="0,4,0,0"
+                           TextWrapping="Wrap" />
+
+                <!-- 会联网的功能：放在这里而不是底部操作条，避免把"撤销"这类危险按钮挤走 -->
+                <Button Content="用 AI 诊断"
+                        Style="{StaticResource SecondaryButtonStyle}"
+                        Command="{Binding DiagnoseWithAiCommand}"
+                        HorizontalAlignment="Left"
+                        Margin="0,8,0,0"
+                        ToolTip="会联网（DeepSeek）：点「确定」前会先显示将要发送的全部内容。只发送已脱敏的日志片段（用户名、计算机名已在本地替换为占位符）。" />
+
+                <TextBlock Text="{Binding AiAvailabilityHint}"
+                           Style="{StaticResource CaptionTextStyle}"
+                           TextWrapping="Wrap"
+                           Margin="0,6,0,0" />
+            </StackPanel>
+        </Border>
+
+        <!-- 行4 「用 AI 诊断」的结果：几百字的回复用只读卡片 + 复制/关闭，而不是 MessageBox。
+             没有回复时整块 Collapsed。 -->
+        <Border Grid.Row="4"
+                Style="{StaticResource CardBorderStyle}"
+                Margin="0,10,0,0"
+                Visibility="{Binding HasAiReply, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                    <TextBlock DockPanel.Dock="Left"
+                               Text="AI 诊断（来自 DeepSeek，仅供参考）"
+                               Style="{StaticResource SectionTitleTextStyle}"
+                               VerticalAlignment="Center"
+                               Margin="0" />
+                    <Button DockPanel.Dock="Right"
+                            Content="关闭"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding ClearAiReplyCommand}"
+                            Margin="8,0,0,0"
+                            ToolTip="收起并清空这块结果（不会改动日志或撤销任何操作）" />
+                    <Button DockPanel.Dock="Right"
+                            Content="复制"
+                            Style="{StaticResource SecondaryButtonStyle}"
+                            Command="{Binding CopyAiReplyCommand}"
+                            ToolTip="把回复正文复制到剪贴板" />
+                </DockPanel>
+
+                <TextBox Text="{Binding AiReplyText, Mode=OneWay}"
+                         Style="{StaticResource AppTextBoxStyle}"
+                         IsReadOnly="True"
+                         IsReadOnlyCaretVisible="False"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Disabled"
+                         MaxHeight="260" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

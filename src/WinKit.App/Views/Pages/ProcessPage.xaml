@@ -1,0 +1,366 @@
+<UserControl x:Class="WinKit.App.Views.Pages.ProcessPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:WinKit.App.ViewModels"
+             Background="{DynamicResource WindowBackgroundBrush}"
+             FontFamily="{DynamicResource AppFontFamily}"
+             FontSize="{DynamicResource FontSizeNormal}"
+             Foreground="{DynamicResource TextPrimaryBrush}">
+    <UserControl.Resources>
+        <!-- 只在本页内使用的小工具，不放进全局主题字典，避免和其他页面抢同一个键 -->
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+
+        <!-- "有文本" 判定：命令行可能因为权限不足而为空，空的时候不显示空输入框 -->
+        <vm:HasTextToBooleanConverter x:Key="TextPresence" />
+
+        <!-- 单元格：左对齐 + 超长省略号。DataGridCell 模板已设 VerticalAlignment=Center，这里只补水平对齐 -->
+        <Style x:Key="ProcessCellTextStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+        </Style>
+
+        <!-- 数字列一律右对齐，位数才能对齐着看 -->
+        <Style x:Key="ProcessCellNumberStyle" TargetType="TextBlock">
+            <Setter Property="HorizontalAlignment" Value="Right" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0" />
+            <Setter Property="TextTrimming" Value="CharacterEllipsis" />
+            <Setter Property="ToolTip" Value="{Binding RelativeSource={RelativeSource Self}, Path=Text}" />
+        </Style>
+    </UserControl.Resources>
+
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <!-- 行0 顶部工具条 -->
+        <Grid Grid.Row="0" Margin="0,0,0,12">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+
+            <TextBlock Grid.Column="0"
+                       Text="进程管理"
+                       Style="{DynamicResource PageTitleTextStyle}"
+                       VerticalAlignment="Center"
+                       Margin="0" />
+
+            <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBox Width="300"
+                         Style="{DynamicResource AppTextBoxStyle}"
+                         Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                         ToolTip="按进程名、描述或 PID 过滤（忽略大小写）" />
+                <CheckBox Content="自动刷新"
+                          Style="{DynamicResource AppCheckBoxStyle}"
+                          IsChecked="{Binding AutoRefresh}"
+                          Margin="12,0,0,0"
+                          VerticalAlignment="Center" />
+                <Button Content="刷新"
+                        Style="{DynamicResource SecondaryButtonStyle}"
+                        Command="{Binding RefreshCommand}"
+                        Margin="12,0,0,0" />
+                <Button Content="结束进程"
+                        Style="{DynamicResource DangerButtonStyle}"
+                        Command="{Binding KillProcessCommand}"
+                        Margin="8,0,0,0"
+                        ToolTip="强制结束选中的进程（需要二次确认，且不会记入撤销中心）" />
+                <Button Content="结束进程树"
+                        Style="{DynamicResource DangerButtonStyle}"
+                        Command="{Binding KillTreeCommand}"
+                        Margin="8,0,0,0"
+                        ToolTip="结束选中的进程以及它的全部子进程（先结束子进程；需要二次确认，且不会记入撤销中心）" />
+            </StackPanel>
+        </Grid>
+
+        <!-- 行1 只读审计模式警告条 -->
+        <Border Grid.Row="1"
+                Margin="0,0,0,12"
+                Background="{DynamicResource SurfaceAltBrush}"
+                BorderBrush="{DynamicResource WarningBrush}"
+                BorderThickness="4,0,0,0"
+                CornerRadius="{DynamicResource CornerRadiusSmall}"
+                Padding="12,8"
+                Visibility="{Binding IsReadOnly, Converter={StaticResource BoolToVisibility}}">
+            <TextBlock Text="只读审计模式已开启：所有写操作被禁用"
+                       Foreground="{DynamicResource WarningBrush}"
+                       FontSize="{DynamicResource FontSizeNormal}"
+                       TextWrapping="Wrap" />
+        </Border>
+
+        <!-- 行2 主体：左侧列表 + 右侧详情 -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" MinWidth="360" />
+                <ColumnDefinition Width="12" />
+                <ColumnDefinition Width="320" />
+            </Grid.ColumnDefinitions>
+
+            <DataGrid x:Name="ProcessGrid"
+                      Grid.Column="0"
+                      Style="{DynamicResource AppDataGridStyle}"
+                      ItemsSource="{Binding Rows}"
+                      SelectedItem="{Binding SelectedRow, Mode=TwoWay}"
+                      AutoGenerateColumns="False"
+                      CanUserSortColumns="True"
+                      Sorting="OnDataGridSorting"
+                      MouseDoubleClick="OnDataGridMouseDoubleClick"
+                      ToolTip="双击某一行可查看该进程的完整详情"
+                      ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                      ScrollViewer.VerticalScrollBarVisibility="Auto"
+                      ScrollViewer.CanContentScroll="True">
+                <DataGrid.Columns>
+                    <DataGridTextColumn Header="名称"
+                                        Binding="{Binding DisplayName}"
+                                        SortMemberPath="DisplayName"
+                                        Width="*"
+                                        MinWidth="140"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellTextStyle}" />
+                    <DataGridTextColumn Header="PID"
+                                        Binding="{Binding Pid}"
+                                        SortMemberPath="Pid"
+                                        Width="80"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellNumberStyle}" />
+                    <DataGridTextColumn Header="CPU"
+                                        Binding="{Binding CpuText}"
+                                        SortMemberPath="CpuText"
+                                        Width="80"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellNumberStyle}" />
+                    <DataGridTextColumn Header="内存"
+                                        Binding="{Binding MemoryText}"
+                                        SortMemberPath="MemoryText"
+                                        Width="100"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellNumberStyle}" />
+                    <DataGridTextColumn Header="线程"
+                                        Binding="{Binding Threads}"
+                                        SortMemberPath="Threads"
+                                        Width="70"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellNumberStyle}" />
+                    <DataGridTextColumn Header="句柄"
+                                        Binding="{Binding Handles}"
+                                        SortMemberPath="Handles"
+                                        Width="80"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellNumberStyle}" />
+                    <DataGridTextColumn Header="启动时间"
+                                        Binding="{Binding StartTimeText}"
+                                        SortMemberPath="StartTimeText"
+                                        Width="150"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellTextStyle}" />
+                    <DataGridTextColumn Header="路径"
+                                        Binding="{Binding Path}"
+                                        SortMemberPath="Path"
+                                        Width="2*"
+                                        MinWidth="160"
+                                        HeaderStyle="{DynamicResource AppDataGridColumnHeaderStyle}"
+                                        ElementStyle="{StaticResource ProcessCellTextStyle}" />
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <!--
+                右列包一层 ScrollViewer：详情卡片内容本来就可能比这一列高（小窗口 / 命令行很长时），
+                而"用 AI 解释"是卡片里的最后一个元素 —— 不滚动就会被裁掉、点不到。
+                只加滚动，不改内部布局。
+            -->
+            <ScrollViewer Grid.Column="2"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- 命令行卡片 -->
+                    <Border Grid.Row="0"
+                            Style="{DynamicResource CardBorderStyle}"
+                            Margin="0,0,0,12">
+                        <StackPanel>
+                            <TextBlock Text="命令行" Style="{DynamicResource SectionTitleTextStyle}" Margin="0,0,0,8" />
+                            <TextBlock Text="正在读取…"
+                                       Style="{DynamicResource CaptionTextStyle}"
+                                       Foreground="{DynamicResource TextSecondaryBrush}"
+                                       Visibility="{Binding IsLoadingCommandLine, Converter={StaticResource BoolToVisibility}}" />
+                            <TextBox Text="{Binding SelectedCommandLine, Mode=OneWay}"
+                                     IsReadOnly="True"
+                                     IsReadOnlyCaretVisible="False"
+                                     MaxHeight="180"
+                                     VerticalScrollBarVisibility="Auto"
+                                     HorizontalScrollBarVisibility="Disabled">
+                                <TextBox.Style>
+                                    <Style TargetType="TextBox" BasedOn="{StaticResource AppTextBoxStyle}">
+                                        <Setter Property="FontFamily" Value="{DynamicResource AppMonoFontFamily}" />
+                                        <Setter Property="FontSize" Value="{DynamicResource FontSizeSmall}" />
+                                        <Setter Property="TextWrapping" Value="Wrap" />
+                                        <Setter Property="AcceptsReturn" Value="True" />
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding SelectedCommandLine, Converter={StaticResource TextPresence}}" Value="True">
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBox.Style>
+                            </TextBox>
+                            <TextBlock Text="—（未选中进程，或该进程的命令行不可读）"
+                                       TextWrapping="Wrap">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource CaptionTextStyle}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding IsLoadingCommandLine}" Value="False" />
+                                                    <Condition Binding="{Binding SelectedCommandLine, Converter={StaticResource TextPresence}}" Value="False" />
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Visibility" Value="Visible" />
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- 进程详情卡片 -->
+                    <Border Grid.Row="1" Style="{DynamicResource CardBorderStyle}" VerticalAlignment="Top">
+                        <StackPanel>
+                            <TextBlock Text="进程详情" Style="{DynamicResource SectionTitleTextStyle}" Margin="0,0,0,8" />
+
+                            <TextBlock Text="{Binding SelectedRow.DisplayName, FallbackValue=未选中进程, TargetNullValue=未选中进程}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontWeight="SemiBold"
+                                       TextTrimming="CharacterEllipsis"
+                                       Margin="0,0,0,10" />
+
+                            <TextBlock Text="路径" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding SelectedRow.Path, FallbackValue=—, TargetNullValue=—}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       FontFamily="{DynamicResource AppMonoFontFamily}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,2,0,8" />
+
+                            <TextBlock Text="启动时间" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding SelectedRow.StartTimeText, FallbackValue=—, TargetNullValue=—}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Margin="0,2,0,8" />
+
+                            <TextBlock Text="线程数" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding SelectedRow.Threads, FallbackValue=—, TargetNullValue=—}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Margin="0,2,0,8" />
+
+                            <TextBlock Text="句柄数" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding SelectedRow.Handles, FallbackValue=—, TargetNullValue=—}"
+                                       Foreground="{DynamicResource TextPrimaryBrush}"
+                                       Margin="0,2,0,8" />
+
+                            <TextBlock Text="内存占用" Style="{DynamicResource CaptionTextStyle}" />
+                            <TextBlock Text="{Binding SelectedRow.MemoryText, FallbackValue=—, TargetNullValue=—}"
+                                       Style="{DynamicResource MetricValueTextStyle}"
+                                       Margin="0,2,0,10" />
+
+                            <TextBlock Text="该进程的信息受权限限制，部分字段不可读。"
+                                       Style="{DynamicResource CaptionTextStyle}"
+                                       Foreground="{DynamicResource WarningBrush}"
+                                       TextWrapping="Wrap"
+                                       Visibility="{Binding SelectedRow.AccessDenied, Converter={StaticResource BoolToVisibility}}" />
+
+                            <Button Content="复制路径"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Command="{Binding CopyPathCommand}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,4,0,0"
+                                    ToolTip="把该进程的可执行文件路径复制到剪贴板" />
+
+                            <!-- 会联网的功能：入口跟着"选中的进程"走，不和本地按钮混为一谈 -->
+                            <Button Content="用 AI 解释"
+                                    Style="{DynamicResource SecondaryButtonStyle}"
+                                    Command="{Binding ExplainWithAiCommand}"
+                                    HorizontalAlignment="Left"
+                                    Margin="0,8,0,0"
+                                    ToolTip="会联网（DeepSeek）：点「确定」前会先显示将要发送的全部内容。只发送这个进程的进程名，不含路径、命令行、PID 或内存数值。" />
+
+                            <TextBlock Text="{Binding AiAvailabilityHint}"
+                                       Style="{DynamicResource CaptionTextStyle}"
+                                       TextWrapping="Wrap"
+                                       Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- 行3 「用 AI 解释」的结果：回复几百字，用只读卡片 + 复制/关闭，而不是 MessageBox。
+             没有回复时整块 Collapsed。放在整宽的位置，避免挤在 320 宽的详情列里。 -->
+        <Border Grid.Row="3"
+                Style="{DynamicResource CardBorderStyle}"
+                Margin="0,12,0,0"
+                Visibility="{Binding HasAiReply, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel>
+                <DockPanel LastChildFill="False" Margin="0,0,0,8">
+                    <TextBlock DockPanel.Dock="Left"
+                               Text="{Binding AiReplySubject}"
+                               Style="{DynamicResource SectionTitleTextStyle}"
+                               VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Margin="0" />
+                    <Button DockPanel.Dock="Right"
+                            Content="关闭"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Command="{Binding ClearAiReplyCommand}"
+                            Margin="8,0,0,0"
+                            ToolTip="收起并清空这块结果（不会结束或修改任何进程）" />
+                    <Button DockPanel.Dock="Right"
+                            Content="复制"
+                            Style="{DynamicResource SecondaryButtonStyle}"
+                            Command="{Binding CopyAiReplyCommand}"
+                            ToolTip="把回复正文复制到剪贴板" />
+                </DockPanel>
+
+                <TextBox Text="{Binding AiReplyText, Mode=OneWay}"
+                         Style="{DynamicResource AppTextBoxStyle}"
+                         IsReadOnly="True"
+                         IsReadOnlyCaretVisible="False"
+                         AcceptsReturn="True"
+                         TextWrapping="Wrap"
+                         VerticalScrollBarVisibility="Auto"
+                         HorizontalScrollBarVisibility="Disabled"
+                         MaxHeight="260" />
+            </StackPanel>
+        </Border>
+
+        <!-- 行4 状态条 -->
+        <Grid Grid.Row="4" Margin="0,10,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Grid.Column="0"
+                       Text="{Binding StatusText}"
+                       Style="{DynamicResource CaptionTextStyle}"
+                       TextTrimming="CharacterEllipsis"
+                       VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1"
+                       Text="{Binding LastRefreshText}"
+                       Style="{DynamicResource CaptionTextStyle}"
+                       VerticalAlignment="Center"
+                       Margin="12,0,0,0" />
+        </Grid>
+    </Grid>
+</UserControl>

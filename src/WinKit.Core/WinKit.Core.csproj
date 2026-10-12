@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>WinKit.Core</RootNamespace>
+    <AssemblyName>WinKit.Core</AssemblyName>
+    <!-- Core 不允许引用 WPF，也不允许 P/Invoke：保证可毫秒级单元测试、保留迁移 .NET 8 的退路 -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Runtime.Serialization" />
+  </ItemGroup>
+
+</Project>

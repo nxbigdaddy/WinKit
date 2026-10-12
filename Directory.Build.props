@@ -1,0 +1,19 @@
+<Project>
+
+  <!-- 全解决方案统一构建配置。net48 上已实测：LangVersion=latest 与 Nullable=enable 均可编译。 -->
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <Version>0.1.0</Version>
+    <Company>WinKit</Company>
+    <Product>WinKit</Product>
+    <NeutralLanguage>zh-CN</NeutralLanguage>
+    <Copyright>WinKit</Copyright>
+    <Deterministic>true</Deterministic>
+    <DebugType>portable</DebugType>
+    <!-- 单目标框架，去掉输出路径里的 net48 层级，便于打包 -->
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <SatelliteResourceLanguages>zh-Hans</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+</Project>
